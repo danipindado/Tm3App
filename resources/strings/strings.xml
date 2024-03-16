@@ -1,0 +1,24 @@
+<strings>
+    <string id="AppName">STEPS TM3 Data</string>
+
+    <string id="LastMACTitle">Last TM3 MAC Address</string>
+    <string id="LastLockTitle">Lock to MAC Address</string>
+    <string id="LabelTitle">Label</string>
+    <string id="Item1Title">Item 1</string>
+    <string id="Item2Title">Item 2</string>
+    <string id="Item3Title">Item 3</string>
+    <string id="ModeNamesTitle">Assist Mode Names</string>
+
+    <string id="ShowOff">Off</string>
+    <string id="ShowBattery">Battery</string>
+    <string id="ShowModeName">Mode Name</string>
+    <string id="ShowModeLetter">Mode Letter</string>
+    <string id="ShowModeNumber">Mode Number</string>
+    <string id="ShowGear">Gear</string>
+    <string id="ShowCadence">Cadence</string>
+    <string id="ShowCurrentSpeed">Current Speed</string>
+    <string id="ShowAssistanceLevel">Assistance Level</string>
+
+    <string id="ModeNamesDefault">Eco/Trail/Boost</string>
+    <string id="ModeNamesAlternate">Eco/Norm/High</string>
+</strings>
