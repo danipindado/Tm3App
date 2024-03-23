@@ -476,33 +476,6 @@ class Tm3Delegate extends Ble.BleDelegate
 		return (state==State_Idle);
 	}
 	
-	// Can only read the MAC address after BLE pairing to a bike (which we do while scanning)
-	// this function will start a read
-	function startReadingMAC()
-	{
-		if (readMACScanResult!=null)
-		{
-			// we keep a count of how many times we've attempted to read the MAC, because it really can fail sometimes
-			// just set an upper limit so don't get stuck here forever
-			if (readMACCounter<readMACCounterMaxAllowed)
-			{
-				if (bleReadMAC())
-				{
-					// started reading the MAC address
-					readMACCounter++;
-				}
-				else
-				{
-					readMACScanResult = null;
-				}
-			}
-			else
-			{
-				readMACScanResult = null;
-			}
-		}
-	}
-	
 	// Called after successfully reading a MAC address from the currently paired bike (during scanning)
 	function completeReadMAC(readMACArray)
 	{
@@ -640,14 +613,6 @@ class Tm3Delegate extends Ble.BleDelegate
 				    		mainView.batteryValue = -1;		// read wouldn't start for some reason ...
 						}
 					}
-					else if (wantNotifyMode!=currentNotifyMode)
-					{
-						writingNotifyMode = wantNotifyMode;
-	    				if (bleWriteNotifications(writingNotifyMode))
-	    				{
-	    					waitingWrite = true;
-	    				}
-					}
 				}
 				break;
 			}
@@ -660,20 +625,10 @@ class Tm3Delegate extends Ble.BleDelegate
     	}
     }
     
-	// 2 service ids are advertised (by EW-EN100)
-	var advertised1ServiceUuid = Ble.stringToUuid("000018ff-5348-494d-414e-4f5f424c4500");	// we don't use this service (no idea what the data is)
-	// lightblue phone app says the following service uuid is being advertised
-	// but CIQ doesn't list it in the returned scan results, only the one above
-	//var advertised2ServiceUuid = Ble.stringToUuid("000018ef-5348-494d-414e-4f5f424c4500");	// this service we also use to get notifications for mode
+	var serviceUuid = Ble.stringToUuid("0000fff0-0000-1000-8000-00805f9b34fb");
+	var notifyCharacteristicUuid = Ble.stringToUuid("0000fff1-0000-1000-8000-00805f9b34fb");
+	var writeCharacteristicUuid = Ble.stringToUuid("0000fff2-0000-1000-8000-00805f9b34fb");
 	
-	var batteryServiceUuid = Ble.stringToUuid("0000180f-0000-1000-8000-00805f9b34fb");
-	var batteryCharacteristicUuid = Ble.stringToUuid("00002a19-0000-1000-8000-00805f9b34fb");
-	
-	var modeServiceUuid = Ble.stringToUuid("000018ef-5348-494d-414e-4f5f424c4500");		// also used in advertising
-	var modeCharacteristicUuid = Ble.stringToUuid("00002ac1-5348-494d-414e-4f5f424c4500");
-	
-	var MACServiceUuid = Ble.stringToUuid("000018fe-1212-efde-1523-785feabcd123");
-	var MACCharacteristicUuid = Ble.stringToUuid("00002ae3-1212-efde-1523-785feabcd123");
 
 	var profileRegisterSuccessCount = 0;
 	var profileRegisterFailCount = 0;
@@ -697,51 +652,17 @@ class Tm3Delegate extends Ble.BleDelegate
     {
 		// read - battery
 		var profile = {
-			:uuid => batteryServiceUuid,
+			:uuid => serviceUuid,
 			:characteristics => [
 				{
-					:uuid => batteryCharacteristicUuid,
+					:uuid => notifyCharacteristicUuid,
 				}
 			]
 		};
-		
-		// notifications - mode, gear
-		// is speed, distance, range, cadence anywhere in the data?
-		// get 3 notifications continuously:
-		// 1 = 02 XX 00 00 00 00 CB 28 00 00 (XX=02 is mode, then speed 2 bytes, assistance level 1 byte, cadence 1 byte, maybe range 2 bytes? 0xCB=203, 0x28=40, 0xCB28=52008)
-		// 2 = 03 B6 5A 36 00 B6 5A 36 00 CC 00 AC 02 2F 00 47 00 60 00
-		// 3 = 00 00 00 FF FF YY 0B 80 80 80 0C F0 10 FF FF 0A 00 (YY=03 is gear if remember correctly)
-		// Mode is 00=off 01=eco 02=trail 03=boost 04=walk 
-		var profile2 = {
-			:uuid => modeServiceUuid,
-			:characteristics => [
-				{
-					:uuid => modeCharacteristicUuid,
-					:descriptors => [Ble.cccdUuid()]	// for requesting notifications set to [1,0]?
-				}
-			]
-		};
-		
-		// light blue displays MAC address as: C3 FC 37 79 B7 C2
-		// which happens to match this!:
-		// 000018fe-1212-efde-1523-785feabcd123
-		// 00002ae3-1212-efde-1523-785feabcd123
-		// C2 b7 79 37 fc c3
-		// read - mac address
-		var profile3 = {
-			:uuid => MACServiceUuid,
-			:characteristics => [
-				{
-					:uuid => MACCharacteristicUuid,
-				}
-			]
-		};
-
+				
 		try
 		{
     		Ble.registerProfile(profile);
-    		Ble.registerProfile(profile2);
-    		Ble.registerProfile(profile3);
 		}
 		catch (e)
 		{
@@ -759,38 +680,6 @@ class Tm3Delegate extends Ble.BleDelegate
 		}
     }
     
-    // tells the BLE device if we want mode/gear notifications on or off 
-    function bleWriteNotifications(wantOn)
-    {
-       	var startedWrite = false;
-    
-    	// get first device (since we only connect to one at a time) and check it is connected
-		var d = Ble.getPairedDevices().next();
-		if (d!=null && d.isConnected())
-		{
-			try
-			{
-				var ds = d.getService(modeServiceUuid);
-				if (ds!=null)
-				{
-					var dsc = ds.getCharacteristic(modeCharacteristicUuid);
-					if (dsc!=null)
-					{
-						var cccd = dsc.getDescriptor(Ble.cccdUuid());
-						cccd.requestWrite([(wantOn?0x01:0x00), 0x00]b);
-						startedWrite = true;
-					}
-				}
-			}
-			catch (e)
-			{
-			    //System.println("catch = " + e.getErrorMessage());			    
-			}
-		}
-		
-		return startedWrite;
-	}
-	
     function bleReadBattery()
     {
     	var startedRead = false;
@@ -806,43 +695,13 @@ class Tm3Delegate extends Ble.BleDelegate
 		{
 			try
 			{
-				var ds = d.getService(batteryServiceUuid);
+				var ds = d.getService(serviceUuid);
 				if (ds!=null)
 				{
-					var dsc = ds.getCharacteristic(batteryCharacteristicUuid);
+					var dsc = ds.getCharacteristic(notifyCharacteristicUuid);
 					if (dsc!=null)
 					{
 						dsc.requestRead();	// had one exception from this when turned off bike, and now a symbol not found error 'Failed invoking <symbol>'
-						startedRead = true;
-					}
-				}
-			}
-			catch (e)
-			{
-			    //System.println("catch = " + e.getErrorMessage());			    
-			}
-		}
-
-		return startedRead;
-    }
-    
-    function bleReadMAC()
-    {
-    	var startedRead = false;
-    
-    	// get first device (since we only connect to one at a time) and check it is connected
-		var d = Ble.getPairedDevices().next();
-		if (d!=null && d.isConnected())
-		{
-			try
-			{
-				var ds = d.getService(MACServiceUuid);
-				if (ds!=null)
-				{
-					var dsc = ds.getCharacteristic(MACCharacteristicUuid);
-					if (dsc!=null)
-					{
-						dsc.requestRead();
 						startedRead = true;
 					}
 				}
@@ -933,7 +792,7 @@ class Tm3Delegate extends Ble.BleDelegate
     			break;
     		}
 
-      		if (iterContains(r.getServiceUuids(), advertised1ServiceUuid))	// check the advertised uuids to see if right sort of device
+      		if (iterContains(r.getServiceUuids(), serviceUuid))	// check the advertised uuids to see if right sort of device
       		{
       			// see if it is a device we haven't checked before
 				var newResult = true;
@@ -981,7 +840,8 @@ class Tm3Delegate extends Ble.BleDelegate
   				// - checking isConnected() here immediately seems to avoid that case happening.
   				if (d.isConnected())
   				{
-  					startReadingMAC();
+			    	System.println("isConnected");
+  					// startReadingMAC();
   				}
   				
  				//mainView.displayString = "paired " + d.getName();
@@ -999,36 +859,19 @@ class Tm3Delegate extends Ble.BleDelegate
 	{
 		if (connectionState==Ble.CONNECTION_STATE_CONNECTED)
 		{
-			startReadingMAC();
+			System.println("onConnectedStateChanged");
+			// startReadingMAC();
 		}
 	}
 	
 	// After requesting a read operation on a characteristic using Characteristic.requestRead() this function will be called when the operation is completed.
 	function onCharacteristicRead(characteristic, status, value)
 	{
-		if (characteristic.getUuid().equals(batteryCharacteristicUuid))
+		if (characteristic.getUuid().equals(notifyCharacteristicUuid))
 		{
 			if (value!=null && value.size()>0)		// (had this return a zero length array once ...)
 			{
 				mainView.batteryValue = value[0].toNumber();	// value is a byte array
-			}
-		}
-		else if (characteristic.getUuid().equals(MACCharacteristicUuid))
-		{
-			if (status==Ble.STATUS_SUCCESS)
-			{
-				if (value!=null && value.size()>0)
-				{
-					completeReadMAC(value.reverse());	// reverse array order to properly match real MAC address as reported by phone
-				}
-				else
-				{
-					failedReadMACScan();
-				}
-			}
-			else
-			{
-				startReadingMAC();	// try reading the MAC address again
 			}
 		}
 		
@@ -1039,7 +882,7 @@ class Tm3Delegate extends Ble.BleDelegate
 	function onDescriptorWrite(descriptor, status)
 	{ 
 		var cd = descriptor.getCharacteristic();
-		if (cd!=null && cd.getUuid().equals(modeCharacteristicUuid))
+		if (cd!=null && cd.getUuid().equals(writeCharacteristicUuid))
 		{
 			if (status==Ble.STATUS_SUCCESS)
 			{
@@ -1054,7 +897,7 @@ class Tm3Delegate extends Ble.BleDelegate
 	// this function will be called after every change to the characteristic.
 	function onCharacteristicChanged(characteristic, value)
 	{
-		if (characteristic.getUuid().equals(modeCharacteristicUuid))
+		if (characteristic.getUuid().equals(writeCharacteristicUuid))
 		{
 			if (value!=null)
 			{
