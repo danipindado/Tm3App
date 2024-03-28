@@ -1,0 +1,13 @@
+[DEBUG]  onScanStateChange scanState=1 status=0
+[DEBUG]  onProfileRegister status=0
+[DEBUG]  onScanResults
+[DEBUG]  getDeviceName FS-ABFEBE
+[DEBUG]  companyId 2001
+[DEBUG]  data [164, 48, 125, 176, 60, 31, 0, 0, 0, 172]
+[DEBUG]  pairing FS-ABFEBE
+[DEBUG]  onScanResults
+[DEBUG]  getDeviceName FS-ABFEBE
+[DEBUG]  companyId 2001
+[DEBUG]  data [164, 48, 125, 176, 60, 31, 0, 0, 0, 172]
+[DEBUG]  pairing FS-ABFEBE
+[DEBUG]  onConnectedStateChanged

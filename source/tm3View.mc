@@ -2,7 +2,7 @@ using Toybox.WatchUi;
 using Toybox.Graphics;
 using Toybox.BluetoothLowEnergy as Ble;
 using Toybox.Application;
-using Toybox.Lang;
+import  Toybox.Lang;
 
 class Logger {
   var minSeverity;
@@ -574,6 +574,7 @@ class Tm3Delegate extends Ble.BleDelegate {
 
   private function iterContains(iter, obj) {
     for (var uuid = iter.next(); uuid != null; uuid = iter.next()) {
+      mainView.logger.logDebug("uuid " + uuid);
       if (uuid.equals(obj)) {
         return true;
       }
@@ -612,22 +613,31 @@ class Tm3Delegate extends Ble.BleDelegate {
       if (r == null) {
         break;
       }
-      if (iterContains(r.getServiceUuids(), serviceUuid)) {
-        // check the advertised uuids to see if right sort of device
-        mainView.logger.logDebug("getDeviceName " + r.getDeviceName());
-        var d = Ble.pairDevice(r);
-        if (d != null) {
-          // it seems that sometimes after pairing onConnectedStateChanged() is not always called
-          // - checking isConnected() here immediately seems to avoid that case happening.
-          if (d.isConnected()) {
-            mainView.logger.logDebug("isConnected");
-            Ble.setScanState(Ble.SCAN_STATE_OFF);
-          }
+        
+      mainView.logger.logDebug("getDeviceName " + r.getDeviceName());
 
-          //mainView.displayString = "paired " + d.getName();
-        } else {
-          //   readMACScanResult = null;
-        }
+      if(r.getDeviceName().equals("FS-ABFEBE")){
+        // identify a FLV5 forumslader device by it's advertised manufacturer ID
+        var iter = r.getManufacturerSpecificDataIterator();
+        for (var dict = iter.next() as Dictionary; dict != null; dict = iter.next()) {
+            mainView.logger.logDebug("companyId " + dict.get(:companyId));
+            mainView.logger.logDebug("data " + dict.get(:data));  
+          }    
+          mainView.logger.logDebug("pairing " + r.getDeviceName());
+          var d = Ble.pairDevice(r);
+          if (d != null) {
+            // it seems that sometimes after pairing onConnectedStateChanged() is not always called
+            // - checking isConnected() here immediately seems to avoid that case happening.
+            // if (d.isConnected()) {
+              mainView.logger.logDebug("isConnected");
+              Ble.setScanState(Ble.SCAN_STATE_OFF);
+            // }
+
+            //mainView.displayString = "paired " + d.getName();
+          } else {
+              mainView.logger.logDebug("isConnected null");
+          }
+        
       }
     }
   }
@@ -635,6 +645,7 @@ class Tm3Delegate extends Ble.BleDelegate {
   // After pairing a device this will be called after the connection is made.
   // (But seemingly not sometimes ... maybe if still connected from previous run of datafield?)
   function onConnectedStateChanged(device, connectionState) {
+      mainView.logger.logDebug("connectionState ",connectionState);
     if (connectionState == Ble.CONNECTION_STATE_CONNECTED) {
       mainView.logger.logDebug("onConnectedStateChanged");
       // startReadingMAC();

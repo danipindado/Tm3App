@@ -1,0 +1,15 @@
+
+---
+Error: Unhandled Exception
+Time: 2024-03-28T17:57:43Z
+Part-Number: 006-B2888-00
+Firmware-Version: '7.20'
+Language-Code: eng
+ConnectIQ-Version: 4.2.4
+Filename: Tm3App
+Appname: STEPS TM3 Data
+Stack: 
+  - pc: 0x10001297
+    File: 'D:\repos\Tm3App\source\tm3View.mc'
+    Line: 627
+    Function: onScanResults
